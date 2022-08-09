@@ -2,13 +2,11 @@
 import tmi from 'tmi.js';
 
 import config from './config.js';
-import * as twitchAPI from './twitchAPI.js';
+import { getCommands } from './commands/index.js';
+import permissions from './lib/permissions.js';
 
 // @ts-ignore
 const client = new tmi.Client({
-  options: {
-    debug: true,
-  },
   connection: {
     secure: true,
     reconnect: true,
@@ -20,36 +18,60 @@ const client = new tmi.Client({
   channels: [config.CHANNEL_NAME],
 });
 
-function initBot(teamMembers) {
-  const membersById = teamMembers
-    .reduce((byId, member) => {
-      byId.set(member._id, member);
-      return byId;
-    }, new Map());
-  const shoutoutsById = new Map();
+const sortedPermissions = Object
+  .entries(permissions)
+  .sort(([, aValue], [, bValue]) => bValue - aValue);
 
+function getUserLevel(badges) {
+  const [, value = permissions.user] = sortedPermissions
+    .find(([permission]) => badges[permission]) || [];
+  return value;
+  // TODO: check if user is follower...
+}
+
+function hasPermission(permission, badges) {
+  return getUserLevel(badges) >= permission;
+}
+
+async function initBot() {
+  const commandsByName = await getCommands();
   client.connect();
   client.on('message', async (channel, tags, message, self) => {
     if (self) return;
+    if (tags['message-type'] === 'whisper') return;
+    if (!message.startsWith('!')) return;
+    const commandArgs = message.split(' ');
+    const commandName = commandArgs.shift().slice(1);
+    const commandInfo = commandsByName.get(commandName);
+    if (!commandInfo) return;
+    tags.badges = tags.badges || {};
+    if (!hasPermission(commandInfo.permission, tags.badges)) {
+      // eslint-disable-next-line consistent-return
+      return client.say(channel, `@${tags.username} you do not have permission to use the command "${commandName}". 🚨👮 This incident has been reported to the internet police. 👮🚨`);
+    }
     const {
       'message-type': messageType,
       'user-id': userId,
       'display-name': displayName,
       username,
     } = tags;
-    const name = displayName ?? username;
-    if (messageType === 'whisper') return;
-    if (userId !== config.CHANNEL_ID && membersById.has(userId)) {
-      if (!shoutoutsById.has(userId) || shoutoutsById.get(userId) + +config.SHOUTOUT_TIMEOUT_MS < Date.now()) {
-        shoutoutsById.set(userId, Date.now());
-        const {
-          game,
-          status,
-        } = await twitchAPI.getChannel(userId);
-        client.say(channel, config.getMessage(name, status, game));
-      }
-    }
+    const name = displayName || username;
+    const args = {
+      ...tags,
+      messageType,
+      userId,
+      displayName,
+      username,
+      name,
+      commandName,
+      commandArgs,
+    };
+    commandInfo.handler({
+      client,
+      channel,
+      args,
+    });
   });
 }
 
-twitchAPI.getTeam(config.TEAM_NAME).then(initBot);
+initBot();

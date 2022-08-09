@@ -3,28 +3,37 @@ import axios from 'axios';
 
 import config from './config.js';
 
-// TODO: cache things reasonably...
-
-const twitchAPI = axios.create({
-  baseURL: 'https://api.twitch.tv/kraken',
+const helixAPI = axios.create({
+  baseURL: 'https://api.twitch.tv/helix',
   headers: {
-    Authorization: `OAuth ${config.TWITCH_OAUTH_TOKEN}`,
     'Client-ID': config.TWITCH_CLIENT_ID,
-    Accept: 'application/vnd.twitchtv.v5+json',
+    Authorization: `Bearer ${config.TWITCH_OAUTH_TOKEN}`
   },
 });
 
-export async function getChannel(channelId) {
-  const { data } = await twitchAPI.get(`/channels/${channelId}`);
-  return data;
+async function getChannel(channelId) {
+  const { data: { data: [channel] } } = await helixAPI.get(`/channels?broadcaster_id=${channelId}`);
+  return channel;
 }
 
 export async function getTeam(teamName) {
-  const { data: { users } } = await twitchAPI.get(`/teams/${teamName}`);
+  const { data: { data: { users } } } = await helixAPI.get(`/teams?name=${teamName}`);
   return users;
 }
 
-export async function getStream(channelId) {
-  const { data: { stream } } = await twitchAPI.get(`/streams/${channelId}`);
-  return stream;
+async function getUsers(...usernames) {
+  const url = `/users?login=${usernames.map((u) => encodeURIComponent(u)).join('&login=')}`;
+  const { data: { data: users } } = await helixAPI.get(url);
+  return users.map((u) => {
+    u.name = u.login;
+    return u;
+  });
+}
+
+export async function getChannelByUsername(username) {
+  const [user] = await getUsers(username);
+  if (user) {
+    return getChannel(user.id);
+  }
+  throw new Error('Not Found!');
 }
