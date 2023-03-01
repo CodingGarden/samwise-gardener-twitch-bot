@@ -1,6 +1,6 @@
-# Twitch Team Shoutout Bot
+# Samwise Gardener Twitch Bot
 
-A bot that detects when a team member has entered the chat and sends a shout out message.
+Forked from the [twitch team shoutout bot], this bot contains coding garden specific commands.
 
 ### Prerequisites
 

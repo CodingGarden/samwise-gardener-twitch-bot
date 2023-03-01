@@ -5,7 +5,10 @@ export default {
   name: 'shoutout',
   permission: permissions.vip,
   aliases: ['so', 'shout'],
-  async handler({ client, args: { name: senderName, commandArgs }, channel }) {
+  platforms: {
+    twitch: true,
+  },
+  async handler({ twitchClient, args: { name: senderName, commandArgs }, channel }) {
     const [username] = commandArgs;
     if (!username) return;
     try {
@@ -16,10 +19,10 @@ export default {
         broadcaster_login,
       } = await twitchAPI.getChannelByUsername(username.replace('@', ''));
       const showName = broadcaster_name.match(/\W/) ? broadcaster_login : broadcaster_name;
-      client.say(channel, `Checkout @${showName}! https://twitch.tv/${showName} They were last seen streaming - ${title} in ${game_name}`);
+      twitchClient.say(channel, `Checkout @${showName}! https://twitch.tv/${showName} They were last seen streaming - ${title} in ${game_name}`);
     } catch (error) {
       console.log(error);
-      client.say(channel, `@${senderName} "${username}" was not found. Are you trying to hack me?`);
+      twitchClient.say(channel, `@${senderName} "${username}" was not found. Are you trying to hack me?`);
     }
   },
 };

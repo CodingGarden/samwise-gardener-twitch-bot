@@ -1,9 +1,24 @@
 import permissions from './lib/permissions.js';
 
-export default [].map((command) => {
+export default [{
+  name: 'ping',
+  aliases: [],
+  message: 'pong',
+  platforms: {
+    youtube: true,
+  },
+}].map((command) => {
   command.handler = ({
-    client,
+    twitchClient,
+    youtubeClient,
     channel,
-  }) => client.say(channel, command.message);
+  }) => {
+    if (twitchClient) {
+      twitchClient.say(channel, command.message);
+    }
+    if (youtubeClient) {
+      youtubeClient.say(command.message);
+    }
+  };
   return command;
 });

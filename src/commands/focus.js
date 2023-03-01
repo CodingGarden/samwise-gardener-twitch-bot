@@ -10,6 +10,7 @@ const commands = {
 const state = {
   focused: false,
   paused: false,
+  indefinite: false,
   endTime: null,
   msRemaining: 0,
 };
@@ -21,8 +22,8 @@ function updateStateSendMessage(client, channel) {
   if (state.focused && !state.paused) {
     state.msRemaining = state.endTime - Date.now();
     const minutes = Math.ceil(state.msRemaining / 1000 / 60);
-    if (minutes > 0) {
-      client.say(channel, `🧘 CJ is in focus mode right now and is not responding to chat. ⏳ Focus mode will end in about ${minutes} minute${minutes > 1 ? 's' : ''}.`);
+    if (state.indefinite || minutes > 0) {
+      client.say(channel, `!info 🧘 CJ is in focus mode right now and is not responding to chat. ${getStatusMessage()}`);
     } else {
       state.focused = false;
       state.paused = false;
@@ -34,12 +35,20 @@ function updateStateSendMessage(client, channel) {
   }
 }
 
+function getStatusMessage() {
+  if (state.indefinite) return '';
+  return `⏳ Focus mode will end in about ${state.minutes} minute${state.minutes > 1 ? 's' : ''}.`;
+}
+
 export default {
   name: commands.focusStart,
   permission: permissions.broadcaster,
   aliases: [commands.focusPause, commands.focusResume, commands.focusEnd],
+  platforms: {
+    twitch: true,
+  },
   async handler({
-    client,
+    twitchClient,
     args: {
       commandName,
       commandArgs,
@@ -49,30 +58,35 @@ export default {
     if (commandName === commands.focusStart && !state.focused && !state.paused) {
       const [minutes] = commandArgs;
       state.focused = true;
-      state.endTime = Date.now() + (1000 * 60 * minutes);
-      client.say(channel, `🧘 Focus mode started. ⏳ Focus mode will end in ${minutes} minutes.`);
+      if (minutes) {
+        state.endTime = Date.now() + (1000 * 60 * minutes);
+      } else {
+        state.indefinite = true;
+      }
+      twitchClient.say(channel, `🧘 Focus mode started. ${getStatusMessage()}`);
       updateInterval = setInterval(() => {
-        updateStateSendMessage(client, channel);
+        updateStateSendMessage(twitchClient, channel);
       }, updateMs);
     } else if (commandName === commands.focusPause && state.focused && !state.paused) {
       state.paused = true;
       state.msRemaining = state.endTime - Date.now();
-      client.say(channel, '⏸🧘 Focus mode paused.');
+      twitchClient.say(channel, '⏸🧘 Focus mode paused.');
       clearInterval(updateInterval);
     } else if (commandName === commands.focusResume && state.focused && state.paused) {
       state.paused = false;
       state.endTime = Date.now() + state.msRemaining;
       const minutes = Math.ceil(state.msRemaining / 1000 / 60);
-      client.say(channel, `▶️🧘 Focus mode resumed. ⏳ Focus mode will end in about ${minutes} minute${minutes > 1 ? 's' : ''}.`);
+      twitchClient.say(channel, `▶️🧘 Focus mode resumed. ${getStatusMessage()}`);
       updateInterval = setInterval(() => {
-        updateStateSendMessage(client, channel);
+        updateStateSendMessage(twitchClient, channel);
       }, updateMs);
     } else if (commandName === commands.focusEnd && state.focused && !state.paused) {
       state.focused = false;
       state.paused = false;
       state.endTime = null;
+      state.indefinite = false;
       state.msRemaining = 0;
-      client.say(channel, '🛑🧘 Focus mode ended.');
+      twitchClient.say(channel, '🛑🧘 Focus mode ended.');
       clearInterval(updateInterval);
     }
   },
