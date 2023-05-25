@@ -48,7 +48,7 @@ async function init() {
       const commandArgs = message.split(' ');
       const commandName = commandArgs.shift().slice(1);
       const commandInfo = commandsByName.get(commandName);
-      if (!commandInfo) return;
+      if (!commandInfo || !commandInfo.platforms.twitch) return;
       tags.badges = tags.badges || {};
       if (!hasPermission(commandInfo.permission, tags.badges)) {
         // eslint-disable-next-line consistent-return
@@ -131,6 +131,9 @@ async function init() {
           youtubeClient: {
             async say(text) {
               try {
+                if (text.startsWith('!info ')) {
+                  text = text.substring(6)
+                }
                 const sentences = splitIntoSentences(text);
                 await sentences.reduce(async (promise, part, index) => {
                   await promise;
